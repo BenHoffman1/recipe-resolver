@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Recipe Resolver</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<!-- Full-page loader -->
+<div id="loader" class="loader">
+    <div class="container">
+        <h1 id="loader-title">Loading recipes (0%)</h1>
+        <video
+                id="loader-video"
+                class="loader-image"
+                src="loading.mp4"
+                muted
+                preload="auto"
+                playsinline
+        ></video>
+
+        <!-- Progress bar wrapper -->
+        <div class="progress-container">
+            <div id="loader-progress"></div>
+        </div>
+    </div>
+</div>
+<!-- Your app, hidden until loading is done -->
+<div id="app" style="display: none;">
+    <div class="container">
+        <h1>🔧 Modern Industrialization Recipe Resolver</h1>
+        <form id="resolver-form">
+            <div class="field">
+                <label for="item">Item ID:</label>
+                <div class="autocomplete">
+                    <input type="text" id="item" placeholder="singularity" autocomplete="off" required />
+                    <div id="autocomplete-list" class="autocomplete-items"></div>
+                </div>
+            </div>
+            <div class="field">
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" value="1" min="1" />
+            </div>
+            <div class="field-inline">
+                <label><input type="checkbox" id="sortByQuantity" /> Sort by quantity</label>
+            </div>
+            <button type="submit">Resolve</button>
+        </form>
+        <pre id="output" class="output"></pre>
+    </div>
+
+</div>
+</body>
+<script src="script.js"></script>
+
+
+</html>
