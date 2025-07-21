@@ -33,23 +33,22 @@ videoEl.addEventListener('loadedmetadata', () => {
 // ———————————————————————————————————————————————————————————————
 async function init() {
     // 1) load manifest
-    const manifest = await fetch('manifest.json').then(r => r.json());
+    const manifest   = await fetch('manifest.json').then(r => r.json());
     const tagPaths    = manifest.tags;
     const recipePaths = manifest.recipes;
     const totalCount  = tagPaths.length + recipePaths.length;
     let loadedCount   = 0;
 
-    // grab our UI elements
-    const titleEl  = document.getElementById('loader-title');
-    const barEl    = document.getElementById('loader-progress');
+    // grab UI elements
+    const titleEl = document.getElementById('loader-title');
+    const barEl   = document.getElementById('loader-progress');
 
     // helper to bump progress
     function tick() {
         loadedCount++;
         const pct = Math.round((loadedCount / totalCount) * 100);
-        barEl.style.width = pct + '%';
-        titleEl.textContent = `Loading recipes (${pct}%)`;
-
+        barEl.style.width     = pct + '%';
+        titleEl.textContent   = `Loading recipes (${pct}%)`;
         if (videoReady && videoEl.duration) {
             videoEl.currentTime = Math.min(
                 videoEl.duration * (loadedCount / totalCount),
@@ -58,29 +57,29 @@ async function init() {
         }
     }
 
-    // 2) fetch tags one by one
-    const tagFiles = [];
-    for (const path of tagPaths) {
-        const data = await fetch(path).then(r => r.json());
-        tagFiles.push({ path, values: data.values || [] });
-        tick();
-    }
+    // 2) fetch *all* tags in parallel
+    const tagFiles = await Promise.all(
+        tagPaths.map(async path => {
+            const data = await fetch(path).then(r => r.json());
+            tick();
+            return { path, values: data.values || [] };
+        })
+    );
     tagsMap = buildTagMap(tagFiles);
 
-    // 3) fetch recipes one by one
-    const recipeFiles = [];
-    for (const path of recipePaths) {
-        const data = await fetch(path).then(r => r.json());
-        recipeFiles.push({ path, data });
-        tick();
-    }
+    // 3) fetch *all* recipes in parallel
+    const recipeFiles = await Promise.all(
+        recipePaths.map(async path => {
+            const data = await fetch(path).then(r => r.json());
+            tick();
+            return { path, data };
+        })
+    );
     recipeIndex = buildRecipeIndex(recipeFiles);
 
-    // 4) build autocomplete source and wire it up
+    // 4) build autocomplete and finish
     allItems = Object.keys(recipeIndex).sort();
     setupAutocomplete();
-
-    // 5) done loading!
     initialized = true;
 }
 
