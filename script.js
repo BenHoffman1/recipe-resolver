@@ -110,17 +110,29 @@ class Recipe {
 
 function buildTagMap(tagFiles) {
     const map = {};
-    tagFiles.forEach(({ path, values }) => {
-        const idx = path.indexOf('/data/');
-        const rel = idx>=0 ? path.slice(idx+6) : path;
-        const parts = rel.split('/');
-        const ns    = parts[0];
-        const tagIdx= parts.includes('items')?parts.indexOf('items'):parts.indexOf('item');
-        const name  = parts.slice(tagIdx+1).join('/').replace(/\.json$/,'');
-        map[`#${ns}:${name}`] = values;
+    tagFiles.forEach(({path, values}) => {
+        const parts = path.replace(/\\/g,'/').split('/');
+        // find the index of "data", then the next part is the namespace
+        const dataIdx = parts.indexOf('data');
+        const ns      = (dataIdx >= 0 && parts.length > dataIdx+1)
+            ? parts[dataIdx+1]
+            : '???';
+        // find where "items" or "item" appears
+        const tagIdx  = parts.indexOf('items') >= 0
+            ? parts.indexOf('items')
+            : parts.indexOf('item');
+        const name    = parts.slice(tagIdx+1).join('/').replace(/\.json$/, '');
+        const key     = `#${ns}:${name}`;
+
+        // merge values as before…
+        if (!map[key]) map[key] = [];
+        map[key].push(...values);
     });
+
+    Object.keys(map).forEach(k => map[k] = [...new Set(map[k])]);
     return map;
 }
+
 
 function buildRecipeIndex(recipeFiles) {
     const idx = {};
