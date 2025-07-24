@@ -32,56 +32,15 @@ videoEl.addEventListener('loadedmetadata', () => {
 // 1) Initialization: load manifest, build tagsMap, recipeIndex, allItems
 // ———————————————————————————————————————————————————————————————
 async function init() {
-    // 1) load manifest
-    const manifest   = await fetch('manifest.json').then(r => r.json());
-    const tagPaths    = manifest.tags;
-    const recipePaths = manifest.recipes;
-    const totalCount  = tagPaths.length + recipePaths.length;
-    let loadedCount   = 0;
+    const { tags, recipes } = await fetch('allData.json').then(r => r.json());
+    tagsMap     = buildTagMap(tags);
+    recipeIndex = buildRecipeIndex(recipes);
 
-    // grab UI elements
-    const titleEl = document.getElementById('loader-title');
-    const barEl   = document.getElementById('loader-progress');
-
-    // helper to bump progress
-    function tick() {
-        loadedCount++;
-        const pct = Math.round((loadedCount / totalCount) * 100);
-        barEl.style.width     = pct + '%';
-        titleEl.textContent   = `Loading recipes (${pct}%)`;
-        if (videoReady && videoEl.duration) {
-            videoEl.currentTime = Math.min(
-                videoEl.duration * (loadedCount / totalCount),
-                videoEl.duration
-            );
-        }
-    }
-
-    // 2) fetch *all* tags in parallel
-    const tagFiles = await Promise.all(
-        tagPaths.map(async path => {
-            const data = await fetch(path).then(r => r.json());
-            tick();
-            return { path, values: data.values || [] };
-        })
-    );
-    tagsMap = buildTagMap(tagFiles);
-
-    // 3) fetch *all* recipes in parallel
-    const recipeFiles = await Promise.all(
-        recipePaths.map(async path => {
-            const data = await fetch(path).then(r => r.json());
-            tick();
-            return { path, data };
-        })
-    );
-    recipeIndex = buildRecipeIndex(recipeFiles);
-
-    // 4) build autocomplete and finish
     allItems = Object.keys(recipeIndex).sort();
     setupAutocomplete();
     initialized = true;
 }
+
 
 
 // ———————————————————————————————————————————————————————————————
