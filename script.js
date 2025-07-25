@@ -32,6 +32,7 @@ videoEl.addEventListener('loadedmetadata', () => {
 // near the top of script.js, after your imports / globals:
 function cleanName(name) {
     return name
+        .replace(/^fluid:/, '')
         .replace(/^modern_industrialization:/, '')
         .replace(/^minecraft:/, '')
         .replace(/c:/g, '');
@@ -75,6 +76,14 @@ class Recipe {
                     if (id) outs.push([id, o.amount || o.count || 1]);
                 }
             });
+        if (d.fluid_outputs) {
+            const arr = Array.isArray(d.fluid_outputs) ? d.fluid_outputs : [d.fluid_outputs];
+            arr.forEach(o => {
+                const id = o.fluid;
+                if (id) outs.push([`fluid:${id}`, o.amount || 1]); // prefix with "fluid:"
+            });
+        }
+
         } else if (d.result) {
             const r = d.result;
             if (typeof r === 'string') outs.push([r, 1]);
@@ -88,6 +97,7 @@ class Recipe {
                 if (id) outs.push([id, typeof o === 'object' ? (o.count || 1) : 1]);
             });
         }
+
         return outs;
     }
 
@@ -113,6 +123,13 @@ class Recipe {
         } else if (d.ingredient) {
             add(d.ingredient);
         }
+        if (d.fluid_inputs) {
+            const arr = Array.isArray(d.fluid_inputs) ? d.fluid_inputs : [d.fluid_inputs];
+            arr.forEach(obj => {
+                if (obj.fluid) items.push([`fluid:${obj.fluid}`, obj.amount || 1]);
+            });
+        }
+
 
         return items;
     }
