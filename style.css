@@ -1,6 +1,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: sans-serif; background: #f4f4f4; color: #333; padding: 2rem; }
-.container { max-width: 600px; margin: auto; background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.container { max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 h1 { margin-bottom: 1rem; font-size: 1.5rem; }
 .field { margin-bottom: 1rem; }
 .field label { display: block; margin-bottom: 0.3rem; }
@@ -75,3 +75,132 @@ button:hover { background: #218838; }
 .checklist li { margin: 0.5em 0; }
 .checklist input[type="checkbox"] { margin-right: 0.5em; }
 .sub-inputs { margin-left: 1.5em; font-size: 0.9em; color: #555; }
+
+#app {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;   /* ← this pins children to the top */
+}
+
+/* ——— Checklist crossing animation ——— */
+.checklist li {
+    position: relative;
+}
+
+/* style the label so we can draw a line over it */
+.checklist li label {
+    position: relative;
+    display: inline-block;
+    transition: color 0.3s ease;
+}
+.checklist li label::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 0;
+    height: 2px;
+    background: currentColor;
+    transform: translateY(-50%);
+    transition: width 0.3s ease;
+}
+
+/* when completed: fade text, draw full line, collapse sub‑inputs */
+.checklist li.completed label {
+    color: #999;
+}
+.checklist li.completed label::after {
+    width: 100%;
+}
+.checklist li.completed .sub-inputs {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease 0.1s;
+}
+
+
+/* ——— Checklist layout & flex label ——— */
+.checklist li {
+    margin: 0.5em 0;
+}
+
+.checklist li label {
+    display: flex;
+    align-items: flex-start;
+    cursor: pointer;
+    /* ensure the text wraps within the remaining space */
+}
+
+.checklist li label input[type="checkbox"] {
+    margin: 0.2em 0.5em 0 0; /* tweak vertical align as needed */
+    flex-shrink: 0;
+}
+
+.checklist li label .step-text {
+    position: relative;
+    /*line-height: 1.4;  !* adjust to match your font *!*/
+    transition: color 0.3s ease;
+}
+
+/* the animated line */
+.checklist li label .step-text::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 2px;
+    width: 0;
+    background: currentColor;
+    transform: translateY(-50%);
+    transition: width 0.3s ease;
+}
+
+/* when checked: fade text, draw the line, and hide sub‑inputs */
+.checklist li.completed label .step-text {
+    color: #999;
+}
+
+.step-text {
+    white-space: nowrap;
+}
+
+.checklist li.completed label .step-text::after {
+    width: 100%;
+}
+
+.checklist li.completed .sub-inputs {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease 0.1s;
+}
+
+input[type="checkbox"] {
+    appearance: none;
+    width: 1.5em;          /* Make it larger for easier tap/click */
+    height: 1.5em;
+    border: 2px solid #8b8c89; /* Custom border */
+    border-radius: 0.25em;    /* Slightly rounded corners */
+    background: #fff;
+    cursor: pointer;          /* Show pointer on hover for UX */
+    display: grid;
+    place-content: center;    /* Center any checkmark */
+}
+
+input[type="checkbox"]:checked {
+    background: #274c77;     /* Custom color when checked */
+    border-color: #274c77;
+}
+
+input[type="checkbox"]:hover {
+    border-color: #a3cef1;   /* Highlight on hover */
+}
+
+/* Custom checkmark with ::before pseudo-element */
+input[type="checkbox"]:checked::before {
+    content: "✓";            /* Unicode checkmark */
+    color: white;
+    font-size: 0.9em;
+}

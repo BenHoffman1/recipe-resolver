@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Recipe Resolver</title>
+    <title>MI Recipe Resolver</title>
     <link rel="stylesheet" href="style.css" />
+
 </head>
 <body>
 <!-- Full-page loader -->
@@ -29,12 +30,12 @@
 <!-- Your app, hidden until loading is done -->
 <div id="app" style="display: none;">
     <div class="container">
-        <h1>🔧 Modern Industrialization Recipe Resolver</h1>
+        <h1>Modern Industrialization Recipe Resolver</h1>
         <form id="resolver-form">
             <div class="field">
                 <label for="item">Item ID:</label>
                 <div class="autocomplete">
-                    <input type="text" id="item" placeholder="singularity" autocomplete="off" required />
+                    <input type="text" id="item" placeholder="singularity" autocomplete="off" required/>
                     <div id="autocomplete-list" class="autocomplete-items"></div>
                 </div>
             </div>
@@ -43,17 +44,22 @@
                 <input type="number" id="quantity" value="1" min="1" />
             </div>
             <div class="field-inline">
-                <label><input type="checkbox" id="sortByQuantity" /> Sort by quantity</label>
+                <label><input type="checkbox" id="sortByQuantity" checked/> Sort by quantity</label>
+                <div class="field-inline">
+                    <label><input type="checkbox" id="showInputs" checked/> Show inputs per step</label>
+                </div>
             </div>
             <button type="submit">Resolve</button>
         </form>
         <pre id="output" class="output"></pre>
         <!-- Checklist container -->
-        <div class="field-inline">
-            <label><input type="checkbox" id="showInputs" /> Show inputs per step</label>
-        </div>
-        <ul id="planChecklist" class="checklist"></ul>
 
+
+
+    </div>
+    <div class="container" id="checklist container">
+        <h2>Checklist</h2>
+        <ul id="planChecklist" class="checklist"></ul>
     </div>
 
 </div>

@@ -29,6 +29,12 @@ videoEl.addEventListener('loadedmetadata', () => {
 
 
 
+// near the top of script.js, after your imports / globals:
+function cleanName(name) {
+    return name
+        .replace(/^modern_industrialization:/, '')
+        .replace(/c:/g, '');
+}
 
 
 // ———————————————————————————————————————————————————————————————
@@ -307,29 +313,39 @@ function planCraft(item, qty, plan = [], seen = new Set()) {
 
 
 function renderChecklist(plan) {
-    const container = document.getElementById('planChecklist');
+    const container  = document.getElementById('planChecklist');
     const showInputs = document.getElementById('showInputs').checked;
     container.innerHTML = '';
 
-    // reverse so dust‑first → final
     plan.slice().reverse().forEach((step, i) => {
-        const li = document.createElement('li');
-        const chk = document.createElement('input');
-        chk.type  = 'checkbox';
-        chk.id    = `step-${i}`;
-        const lbl = document.createElement('label');
-        lbl.htmlFor = chk.id;
-        lbl.textContent = `Run ${step.machine} × ${step.runs} → makes ${step.item}`;
+        const li    = document.createElement('li');
+        const label = document.createElement('label');
+        label.className = 'step-label';
 
-        li.appendChild(chk);
-        li.appendChild(lbl);
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.id   = `step-${i}`;
+
+        // strip prefixes from the item name
+        const span = document.createElement('span');
+        span.className   = 'step-text';
+        span.textContent = `Run ${step.machine} × ${step.runs} → makes ${cleanName(step.item)}`;
+
+        chk.addEventListener('change', () => {
+            li.classList.toggle('completed', chk.checked);
+        });
+
+        label.appendChild(chk);
+        label.appendChild(span);
+        li.appendChild(label);
 
         if (showInputs && step.inputs.length) {
             const sub = document.createElement('ul');
             sub.className = 'sub-inputs';
-            step.inputs.forEach(([ing,amt])=>{
+            step.inputs.forEach(([ing, amt]) => {
                 const subLi = document.createElement('li');
-                subLi.textContent = `${amt} × ${ing}`;
+                // strip prefixes from each raw input too
+                subLi.textContent = `${amt} × ${cleanName(ing)}`;
                 sub.appendChild(subLi);
             });
             li.appendChild(sub);
@@ -417,7 +433,8 @@ document.getElementById('resolver-form').addEventListener('submit', async e => {
 
     let out = `=== Bill of Materials ===\n${qty} × ${item}\n\n`;
     entries.forEach(([itm, count]) => {
-        if (count) out += `  ${count} × ${itm}\n`;
+        if (count) out += `  ${count} × ${cleanName(itm)}\n`;
+
     });
     document.getElementById('output').textContent = out;
 
@@ -440,5 +457,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Once init completes:
     document.getElementById('loader').style.display = 'none';
-    document.getElementById('app').style.display    = 'block';
+    document.getElementById('app').style.display    = 'flex';
 });
