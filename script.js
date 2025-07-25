@@ -33,6 +33,7 @@ videoEl.addEventListener('loadedmetadata', () => {
 function cleanName(name) {
     return name
         .replace(/^modern_industrialization:/, '')
+        .replace(/^minecraft:/, '')
         .replace(/c:/g, '');
 }
 
@@ -378,7 +379,7 @@ function setupAutocomplete() {
                 const div = document.createElement('div');
                 div.className = 'autocomplete-item';
                 const re = new RegExp(val,'i');
-                div.innerHTML  = it.replace(re, m=>`<strong>${m}</strong>`);
+                div.innerHTML  = cleanName(it).replace(re, m=>`<strong>${m}</strong>`);
                 div.dataset.val = it;
                 div.addEventListener('click', ()=>{
                     inp.value = it;
@@ -390,16 +391,54 @@ function setupAutocomplete() {
 
     inp.addEventListener('keydown', function(e){
         const items = list.querySelectorAll('.autocomplete-item');
-        if      (e.key==='ArrowDown') { focus = (focus+1)%items.length; setActive(items); e.preventDefault(); }
-        else if (e.key==='ArrowUp')   { focus = (focus-1+items.length)%items.length; setActive(items); e.preventDefault(); }
-        else if (e.key==='Enter'||e.key==='Tab') {
-            if (focus>-1 && items[focus]) {
+        if (items.length === 0) return; // No suggestions -> normal Tab behavior
+
+        // Detect Shift+Tab specifically
+        const isShiftTab = e.key === 'Tab' && e.shiftKey;
+
+        if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
+            // Cycle downward
+            focus = (focus + 1) % items.length;
+            setActive(items);
+            ensureVisible(items[focus]);
+            e.preventDefault();
+        }
+        else if (e.key === 'ArrowUp' || isShiftTab) {
+            // Cycle upward
+            focus = (focus - 1 + items.length) % items.length;
+            setActive(items);
+            ensureVisible(items[focus]);
+            e.preventDefault();
+        }
+        else if (e.key === 'Enter') {
+            if (focus > -1 && items[focus]) {
                 inp.value = items[focus].dataset.val;
                 e.preventDefault();
             }
             list.innerHTML = '';
-        } else focus = -1;
+        }
+        else {
+            focus = -1;
+        }
     });
+
+// Make selected item visible inside list container
+    function ensureVisible(el) {
+        if (!el) return;
+        const container = list;
+
+        const elTop = el.offsetTop;
+        const elBottom = elTop + el.offsetHeight;
+        const viewTop = container.scrollTop;
+        const viewBottom = viewTop + container.clientHeight;
+
+        if (elTop < viewTop) {
+            container.scrollTop = elTop; // Scroll up
+        } else if (elBottom > viewBottom) {
+            container.scrollTop = elBottom - container.clientHeight; // Scroll down
+        }
+    }
+
 
     function setActive(items) {
         items.forEach(x=>x.classList.remove('autocomplete-active'));
