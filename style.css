@@ -204,3 +204,9 @@ input[type="checkbox"]:checked::before {
     color: white;
     font-size: 0.9em;
 }
+
+.field-inline * {
+    display: flex;
+    flex-direction: row;
+    gap: .3rem;
+}
