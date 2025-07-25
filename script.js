@@ -194,6 +194,11 @@ function scoreRecipe(r, item) {
 }
 
 function resolve(item, qty, cache={}, stack=new Set()) {
+    // Skip template entirely
+    if (item.includes('packer_double_ingot_template')) {
+        return {}; // treated as free
+    }
+
     const key = `${item}:${qty}`;
     if (cache[key]) return {...cache[key]};
 
@@ -217,7 +222,7 @@ function resolve(item, qty, cache={}, stack=new Set()) {
         item = ci;
     }
 
-    // 3) ignore templates
+    // 3) ignore templates (legacy safeguard)
     if (item.startsWith('modern_industrialization:') && item.endsWith('_template'))
         return cache[key] = {};
 
@@ -235,7 +240,9 @@ function resolve(item, qty, cache={}, stack=new Set()) {
         if (c.data.type?.endsWith(':assembler')) {
             let sub = {};
             c.getInputs().forEach(([i,amt])=>{
-                sub = addCounters(sub, resolve(i, amt*qty, cache, stack));
+                if (!i.includes('packer_double_ingot_template')) {
+                    sub = addCounters(sub, resolve(i, amt*qty, cache, stack));
+                }
             });
             return cache[key] = sub;
         }
@@ -251,6 +258,7 @@ function resolve(item, qty, cache={}, stack=new Set()) {
         stack.add(item);
         let sub = {}, bad = false;
         for (const [i,amt] of c.getInputs()) {
+            if (i.includes('packer_double_ingot_template')) continue;
             const part = resolve(i, amt*mult, cache, stack);
             sub = addCounters(sub, part);
             if ([...stack].some(x=>sub[x]>0)) { bad = true; break; }
@@ -272,6 +280,11 @@ function resolve(item, qty, cache={}, stack=new Set()) {
  * Build a list of recipe‑runs: each { machine, item, runs, inputs }
  */
 function planCraft(item, qty, plan = [], seen = new Set()) {
+    // Skip if template itself
+    if (item.includes('packer_double_ingot_template')) {
+        return plan;
+    }
+
     // 1) terminal dust or raw
     const nm = item.split(':').pop();
     if ((nm.includes('dust') && !nm.includes('tiny')) || !(recipeIndex[item]?.length)) {
@@ -293,15 +306,18 @@ function planCraft(item, qty, plan = [], seen = new Set()) {
     const outAmt = use.outputs.find(o=>o[0]===item)[1] || 1;
     const runs   = Math.ceil(qty / outAmt);
 
-    // record inputs scaled by runs
-    const inputs = use.getInputs().map(([ing,amt])=>[ing, amt * runs]);
+    // record inputs scaled by runs, skipping template
+    const inputs = use.getInputs()
+        .filter(([ing]) => !ing.includes('packer_double_ingot_template'))
+        .map(([ing,amt]) => [ing, amt * runs]);
 
-    // push this step
+    // push this step (now includes recipe path)
     plan.push({
         machine: use.data.type.split(':').pop(),
         item,
         runs,
-        inputs
+        inputs,
+        path: use.path   // add path to step
     });
 
     // recurse on each input
@@ -327,9 +343,9 @@ function renderChecklist(plan) {
         chk.type = 'checkbox';
         chk.id   = `step-${i}`;
 
-        // strip prefixes from the item name
+        // Main line: machine, runs, and item
         const span = document.createElement('span');
-        span.className   = 'step-text';
+        span.className = 'step-text';
         span.textContent = `Run ${step.machine} × ${step.runs} → makes ${cleanName(step.item)}`;
 
         chk.addEventListener('change', () => {
@@ -340,12 +356,22 @@ function renderChecklist(plan) {
         label.appendChild(span);
         li.appendChild(label);
 
+        // **NEW: Show file path under the main line**
+        if (step.path) {
+            const pathDiv = document.createElement('div');
+            pathDiv.className = 'step-path';
+            pathDiv.style.fontSize = '0.8em';
+            pathDiv.style.opacity = '0.7';
+            pathDiv.textContent = `Recipe file: ${step.path}`;
+            li.appendChild(pathDiv);
+        }
+
+        // Show inputs if toggle enabled
         if (showInputs && step.inputs.length) {
             const sub = document.createElement('ul');
             sub.className = 'sub-inputs';
             step.inputs.forEach(([ing, amt]) => {
                 const subLi = document.createElement('li');
-                // strip prefixes from each raw input too
                 subLi.textContent = `${amt} × ${cleanName(ing)}`;
                 sub.appendChild(subLi);
             });
@@ -372,17 +398,24 @@ function setupAutocomplete() {
         list.innerHTML = '';
         focus = -1;
         if (!val) return;
+
         allItems
-            .filter(i => i.toLowerCase().includes(val.toLowerCase()))
+            .filter(i => cleanName(i).toLowerCase().includes(val.toLowerCase()))
             .slice(0,20)
             .forEach(it => {
                 const div = document.createElement('div');
                 div.className = 'autocomplete-item';
-                const re = new RegExp(val,'i');
-                div.innerHTML  = cleanName(it).replace(re, m=>`<strong>${m}</strong>`);
+
+                // Highlight matches in cleaned name
+                const cleaned = cleanName(it);
+                const re = new RegExp(val, 'i');
+                div.innerHTML  = cleaned.replace(re, m=>`<strong>${m}</strong>`);
+
+                // Keep raw value internally
                 div.dataset.val = it;
+
                 div.addEventListener('click', ()=>{
-                    inp.value = it;
+                    inp.value = cleaned;  // show clean name in input
                     list.innerHTML = '';
                 });
                 list.appendChild(div);
@@ -393,18 +426,15 @@ function setupAutocomplete() {
         const items = list.querySelectorAll('.autocomplete-item');
         if (items.length === 0) return; // No suggestions -> normal Tab behavior
 
-        // Detect Shift+Tab specifically
         const isShiftTab = e.key === 'Tab' && e.shiftKey;
 
         if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
-            // Cycle downward
             focus = (focus + 1) % items.length;
             setActive(items);
             ensureVisible(items[focus]);
             e.preventDefault();
         }
         else if (e.key === 'ArrowUp' || isShiftTab) {
-            // Cycle upward
             focus = (focus - 1 + items.length) % items.length;
             setActive(items);
             ensureVisible(items[focus]);
@@ -412,7 +442,7 @@ function setupAutocomplete() {
         }
         else if (e.key === 'Enter') {
             if (focus > -1 && items[focus]) {
-                inp.value = items[focus].dataset.val;
+                inp.value = cleanName(items[focus].dataset.val);
                 e.preventDefault();
             }
             list.innerHTML = '';
@@ -422,23 +452,21 @@ function setupAutocomplete() {
         }
     });
 
-// Make selected item visible inside list container
+    // Scroll selection into view
     function ensureVisible(el) {
         if (!el) return;
         const container = list;
-
         const elTop = el.offsetTop;
         const elBottom = elTop + el.offsetHeight;
         const viewTop = container.scrollTop;
         const viewBottom = viewTop + container.clientHeight;
 
         if (elTop < viewTop) {
-            container.scrollTop = elTop; // Scroll up
+            container.scrollTop = elTop;
         } else if (elBottom > viewBottom) {
-            container.scrollTop = elBottom - container.clientHeight; // Scroll down
+            container.scrollTop = elBottom - container.clientHeight;
         }
     }
-
 
     function setActive(items) {
         items.forEach(x=>x.classList.remove('autocomplete-active'));
@@ -456,28 +484,31 @@ function setupAutocomplete() {
 document.getElementById('resolver-form').addEventListener('submit', async e => {
     e.preventDefault();
 
-    // 1) Read user inputs
-    const item      = document.getElementById('item').value.trim();
+    // Convert cleaned input to raw ID
+    const userInput = document.getElementById('item').value.trim();
+    const item = allItems.find(id => cleanName(id) === userInput) || userInput;
+
     const qty       = parseInt(document.getElementById('quantity').value, 10) || 1;
     const sortByQty = document.getElementById('sortByQuantity').checked;
 
-    // 2) Generate Bill of Materials
+    // Generate BOM
     const bom = resolve(item, qty);
-    let entries = Object.entries(bom);
+    let entries = Object.entries(bom)
+        .filter(([itm]) => !itm.includes('packer_double_ingot_template'));
+
     if (sortByQty) {
         entries.sort((a, b) => b[1] - a[1]);
     } else {
         entries.sort((a, b) => a[0].localeCompare(b[0]));
     }
 
-    let out = `=== Bill of Materials ===\n${qty} × ${item}\n\n`;
+    let out = `=== Bill of Materials ===\n${qty} × ${cleanName(item)}\n\n`;
     entries.forEach(([itm, count]) => {
         if (count) out += `  ${count} × ${cleanName(itm)}\n`;
-
     });
     document.getElementById('output').textContent = out;
 
-    // 3) Build and render the backwards checklist
+    // Build and render backwards checklist
     lastPlan = planCraft(item, qty);
     renderChecklist(lastPlan);
 });
