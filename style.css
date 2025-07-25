@@ -70,3 +70,8 @@ button:hover { background: #218838; }
     background: #28a745;
     transition: width 0.2s ease;
 }
+
+.checklist { list-style: none; padding-left: 0; }
+.checklist li { margin: 0.5em 0; }
+.checklist input[type="checkbox"] { margin-right: 0.5em; }
+.sub-inputs { margin-left: 1.5em; font-size: 0.9em; color: #555; }

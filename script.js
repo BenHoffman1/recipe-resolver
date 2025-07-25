@@ -8,6 +8,9 @@ let recipeIndex  = {};
 let allItems     = [];
 let initialized  = false;
 
+let lastPlan = [];    // holds the most recent planCraft result
+
+
 // at the top, after grabbing your UI elements
 const videoEl  = document.getElementById('loader-video');
 let videoReady = false;
@@ -254,6 +257,91 @@ function resolve(item, qty, cache={}, stack=new Set()) {
 }
 
 // ———————————————————————————————————————————————————————————————
+// 3.1) Craft‑plan: generate step list (machine & runs count)
+// ———————————————————————————————————————————————————————————————
+
+
+/**
+ * Build a list of recipe‑runs: each { machine, item, runs, inputs }
+ */
+function planCraft(item, qty, plan = [], seen = new Set()) {
+    // 1) terminal dust or raw
+    const nm = item.split(':').pop();
+    if ((nm.includes('dust') && !nm.includes('tiny')) || !(recipeIndex[item]?.length)) {
+        return plan;
+    }
+
+    // 2) choose assembler‑first, else best‑scored
+    const recs = recipeIndex[item] || [];
+    const use = recs.find(r => r.data.type?.endsWith(':assembler'))
+        || recs.slice().sort((a,b)=>scoreRecipe(a,item)-scoreRecipe(b,item))[0];
+    if (!use) return plan;
+
+    // avoid loops
+    const key = `${use.path}|${qty}`;
+    if (seen.has(key)) return plan;
+    seen.add(key);
+
+    // how many runs are needed
+    const outAmt = use.outputs.find(o=>o[0]===item)[1] || 1;
+    const runs   = Math.ceil(qty / outAmt);
+
+    // record inputs scaled by runs
+    const inputs = use.getInputs().map(([ing,amt])=>[ing, amt * runs]);
+
+    // push this step
+    plan.push({
+        machine: use.data.type.split(':').pop(),
+        item,
+        runs,
+        inputs
+    });
+
+    // recurse on each input
+    inputs.forEach(([ing, totalAmt])=> {
+        planCraft(ing, totalAmt, plan, seen);
+    });
+
+    return plan;
+}
+
+
+function renderChecklist(plan) {
+    const container = document.getElementById('planChecklist');
+    const showInputs = document.getElementById('showInputs').checked;
+    container.innerHTML = '';
+
+    // reverse so dust‑first → final
+    plan.slice().reverse().forEach((step, i) => {
+        const li = document.createElement('li');
+        const chk = document.createElement('input');
+        chk.type  = 'checkbox';
+        chk.id    = `step-${i}`;
+        const lbl = document.createElement('label');
+        lbl.htmlFor = chk.id;
+        lbl.textContent = `Run ${step.machine} × ${step.runs} → makes ${step.item}`;
+
+        li.appendChild(chk);
+        li.appendChild(lbl);
+
+        if (showInputs && step.inputs.length) {
+            const sub = document.createElement('ul');
+            sub.className = 'sub-inputs';
+            step.inputs.forEach(([ing,amt])=>{
+                const subLi = document.createElement('li');
+                subLi.textContent = `${amt} × ${ing}`;
+                sub.appendChild(subLi);
+            });
+            li.appendChild(sub);
+        }
+
+        container.appendChild(li);
+    });
+}
+
+
+
+// ———————————————————————————————————————————————————————————————
 // 4) Autocomplete setup (uses the now-populated allItems)
 // ———————————————————————————————————————————————————————————————
 
@@ -310,31 +398,46 @@ function setupAutocomplete() {
 // ———————————————————————————————————————————————————————————————
 // 5) Form submission → run resolver
 // ———————————————————————————————————————————————————————————————
-document.getElementById('resolver-form').addEventListener('submit', async e=>{
+document.getElementById('resolver-form').addEventListener('submit', async e => {
     e.preventDefault();
-    // if (!initialized) await init();
 
+    // 1) Read user inputs
     const item      = document.getElementById('item').value.trim();
-    const qty       = parseInt(document.getElementById('quantity').value,10)||1;
+    const qty       = parseInt(document.getElementById('quantity').value, 10) || 1;
     const sortByQty = document.getElementById('sortByQuantity').checked;
 
+    // 2) Generate Bill of Materials
     const bom = resolve(item, qty);
     let entries = Object.entries(bom);
-    if (sortByQty)
-        entries.sort((a,b)=>b[1]-a[1]);
-    else
-        entries.sort((a,b)=>a[0].localeCompare(b[0]));
+    if (sortByQty) {
+        entries.sort((a, b) => b[1] - a[1]);
+    } else {
+        entries.sort((a, b) => a[0].localeCompare(b[0]));
+    }
 
     let out = `=== Bill of Materials ===\n${qty} × ${item}\n\n`;
-    entries.forEach(([itm,c])=>{ if(c) out+=`  ${c} × ${itm}\n`; });
-
+    entries.forEach(([itm, count]) => {
+        if (count) out += `  ${count} × ${itm}\n`;
+    });
     document.getElementById('output').textContent = out;
+
+    // 3) Build and render the backwards checklist
+    lastPlan = planCraft(item, qty);
+    renderChecklist(lastPlan);
 });
+
+
 
 // As soon as the DOM is ready, fetch manifest/tags/recipes and wire up autocomplete
 document.addEventListener('DOMContentLoaded', async () => {
     // Show loader (already visible by default)
     await init();                     // fetch + build indexes
+
+    document.getElementById('showInputs')
+        .addEventListener('change', () => {
+            if (lastPlan.length) renderChecklist(lastPlan);
+        });
+
     // Once init completes:
     document.getElementById('loader').style.display = 'none';
     document.getElementById('app').style.display    = 'block';
