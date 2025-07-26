@@ -8,8 +8,9 @@ let recipeIndex  = {};
 let allItems     = [];
 let initialized  = false;
 
-let lastPlan = [];    // holds the most recent planCraft result
-
+let lastPlan = [];     // holds the most recent planCraft result
+let lastItemID   = null;  // track what we just resolved
+let lastItemQty  = 1;
 
 // at the top, after grabbing your UI elements
 const videoEl  = document.getElementById('loader-video');
@@ -222,8 +223,13 @@ function resolve(item, qty, cache={}, stack=new Set()) {
     // 1) furnace → dust
     {
         const recsAll = recipeIndex[item] || [];
-        const F = new Set(['minecraft:smelting','minecraft:blasting','minecraft:smoking']);
-        if (recsAll.some(r=>F.has(r.data.type))) {
+                const F = new Set([
+                    'minecraft:smelting',
+                    'minecraft:blasting',
+                    'minecraft:smoking',
+                    'modern_industrialization:blast_furnace',
+                    'modern_industrialization:crusher'
+                ]);        if (recsAll.some(r=>F.has(r.data.type))) {
             const mat    = item.split(':').pop().replace(/_ore$|_ingot$/,'');
             const dustTag= `#c:dusts/${mat}`;
             const cd     = concreteFromTag(dustTag);
@@ -291,6 +297,22 @@ function resolve(item, qty, cache={}, stack=new Set()) {
 // ———————————————————————————————————————————————————————————————
 // 3.1) Craft‑plan: generate step list (machine & runs count)
 // ———————————————————————————————————————————————————————————————
+
+
+/**
+ * Given a list of [itemID, qty] pairs, return a flattened
+ * map { rawID: totalQty } by feeding each through resolve().
+ */
+function resolveInputsRaw(inputs) {
+    const rawTotals = {};
+    inputs.forEach(([id, amt]) => {
+        const parts = resolve(id, amt);
+        Object.entries(parts).forEach(([rawID, rawAmt]) => {
+            rawTotals[rawID] = (rawTotals[rawID] || 0) + rawAmt;
+        });
+    });
+    return rawTotals;
+}
 
 
 /**
@@ -383,11 +405,11 @@ function renderChecklist(plan) {
             li.appendChild(pathDiv);
         }
 
-        // Show inputs if toggle enabled
+        // Show *raw‑material* inputs if toggle enabled
         if (showInputs && step.inputs.length) {
+            const raw = resolveInputsRaw(step.inputs);
             const sub = document.createElement('ul');
-            sub.className = 'sub-inputs';
-            step.inputs.forEach(([ing, amt]) => {
+            Object.entries(raw).forEach(([ing, amt]) => {
                 const subLi = document.createElement('li');
                 subLi.textContent = `${amt} × ${cleanName(ing)}`;
                 sub.appendChild(subLi);
@@ -395,8 +417,27 @@ function renderChecklist(plan) {
             li.appendChild(sub);
         }
 
+
         container.appendChild(li);
     });
+
+        // ———————————————————————————————————————————————————————————————
+        //  Add an “Aggregated Raw Materials” summary (matches your BOM)
+        // ———————————————————————————————————————————————————————————————
+    if (document.getElementById('showInputs').checked && lastItemID) {
+        const summary = resolve(lastItemID, lastItemQty);
+        const hdr = document.createElement('h3');
+        hdr.textContent = 'Raw Materials (Aggregated):';
+        container.appendChild(hdr);
+
+        const ulSum = document.createElement('ul');
+        Object.entries(summary).forEach(([ing, amt]) => {
+                const li = document.createElement('li');
+                li.textContent = `${amt} × ${cleanName(ing)}`;
+                ulSum.appendChild(li);
+              });
+        container.appendChild(ulSum);
+        }
 }
 
 
@@ -527,6 +568,8 @@ document.getElementById('resolver-form').addEventListener('submit', async e => {
 
     // Build and render backwards checklist
     lastPlan = planCraft(item, qty);
+    lastItemID  = item;
+    lastItemQty = qty;
     renderChecklist(lastPlan);
 });
 
