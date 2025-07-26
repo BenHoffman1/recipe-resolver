@@ -204,12 +204,40 @@ function addCounters(a, b) {
 
 function scoreRecipe(r, item) {
     const ins = r.getInputs();
+    let score = ins.length;
+
     const same     = ins.some(([i]) => i===item || i===`#${item}`);
     const compress = ins.some(([i]) => i.includes('_block')||i.includes(':block'));
     const dustBonus= ins.some(([i]) => i.includes('dust'));
     const oreBonus = ins.some(([i]) => i.includes('ore'));
-    return ins.length + (same?8:0) + (compress?4:0) - (dustBonus?2:0) - (oreBonus?1:0);
+    if (same)     score += 8;
+    if (compress) score += 4;
+    if (dustBonus)score -= 2;
+    if (oreBonus) score -= 1;
+    if (ins.some(([id]) => id.includes('emerald'))) {
+        score += 50;   // treat emerald‑based recipes as last resort
+    }
+
+
+    // Prefer recipes with more outputs (they often give by‑products)
+    score -= r.outputs.length;
+
+    // Penalise heavy catalyst usage; reward larger output amounts
+    const itemAmt   = ins.reduce((sum,[id,amt]) => sum + (typeof amt === 'number' ? amt : 1), 0);
+    const outputAmt = r.outputs.reduce((sum,[id,c]) => sum + (typeof c === 'number' ? c : 1), 0);
+    score += itemAmt * 0.1;
+    score -= outputAmt * 0.01;
+
+    // Explicitly avoid lead‑catalyst polymerization
+    if (r.path.includes('_lead')) score += 3;
+
+    // Prefer distillation towers over simple distillery when the output count is equal
+    if (r.data.type?.includes('distillation_tower')) score -= 1;
+
+
+    return score;
 }
+
 
 function resolve(item, qty, cache={}, stack=new Set()) {
     // Skip template entirely
@@ -251,7 +279,7 @@ function resolve(item, qty, cache={}, stack=new Set()) {
 
     // 4) dust terminal
     const nm = item.split(':').pop();
-    if (nm.includes('dust') && !nm.includes('tiny'))
+    if ((nm.includes('dust') && !nm.includes('tiny')) || nm.includes('oxygen'))
         return cache[key] = {[item]:qty};
 
     // 5) cycle guard
